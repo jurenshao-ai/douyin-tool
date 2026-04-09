@@ -10,9 +10,13 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ success: false, error: "缺少 url 参数" });
     }
 
-    // 🌟 换用另一个非常出名且稳定的免费去水印接口 (韩小韩API)
-    const apiUrl = `https://api.vvhan.com/api/wm?url=${encodeURIComponent(url)}`;
+    // 🌟 1. 填入你的专属 API 密钥
+    const apiKey = "f05b8c025b4492cceb6314581a3c41bd";
+    
+    // 根据文档，直接拼接请求地址
+    const apiUrl = `https://api.66laji.cn/api/spqushuiyin/index.php?apikey=${apiKey}&url=${encodeURIComponent(url)}`;
 
+    // 🌟 2. 发起 GET 请求
     const response = await fetch(apiUrl, {
       method: "GET",
       headers: {
@@ -20,26 +24,35 @@ module.exports = async function handler(req, res) {
       }
     });
 
-    // 🛡️ 防崩溃保护：先拿纯文本，不着急转 JSON
-    const rawText = await response.text();
+    const data = await response.json();
 
-    // 检查是不是被防火墙拦截，返回了 HTML 网页
-    if (rawText.trim().startsWith("<")) {
-      throw new Error("第三方接口开启了防爬虫验证，Vercel 海外节点被拦截");
-    }
+    // 🌟 3. 精准解析返回结果 (严格按照接口文档的说明)
+    // 文档示例显示，获取成功时 code 为 0
+    if (data.code === 0 && data.data) { 
+      
+      const itemData = data.data;
+      let finalUrl = itemData.video_url;
+      let title = itemData.desc || itemData.title || "解析成功";
 
-    // 确认是安全的数据后再解析
-    const data = JSON.parse(rawText);
+      // 💡 额外的小优化：如果用户输入的是图文（图片），尝试返回第一张无水印图片
+      if (!finalUrl && itemData.type === "image" && itemData.images && itemData.images.length > 0) {
+          finalUrl = itemData.images[0];
+          title = "[图文作品] " + title;
+      }
 
-    // 韩小韩 API 的成功标识是 success 为 true
-    if (data.success) {
+      if (!finalUrl) {
+          throw new Error("解析成功，但未能提取到视频或图片链接");
+      }
+
       return res.status(200).json({
         success: true,
-        video: data.video || data.url, // 兼容接口可能返回的不同字段
-        desc: data.title || data.desc || "解析成功！",
+        video: finalUrl,
+        desc: title,
       });
+
     } else {
-      throw new Error(data.message || "第三方接口解析失败");
+      // 获取 msg 字段中的错误提示返回给前端
+      throw new Error(data.msg || "API 接口解析失败");
     }
 
   } catch (e) {
