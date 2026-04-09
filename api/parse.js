@@ -27,9 +27,30 @@ module.exports = async function handler(req, res) {
     const videoId = match[1];
 
     // 3️⃣ 调用抖音接口
-    const api = `https://www.iesdouyin.com/web/api/v2/aweme/iteminfo/?item_ids=${videoId}`;
+    const api = `https://www.iesdouyin.com/web/api/v2/aweme/iteminfo/?item_ids=${videoId}&aid=1128`;
 
-    const data = await fetch(api).then((r) => r.json());
+    const dataRes = await fetch(api, {
+  method: "GET",
+  headers: {
+    "user-agent":
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X)",
+  },
+});
+
+const dataText = await dataRes.text();
+
+// 👉 调试用（可保留）
+if (!dataText) {
+  throw new Error("接口返回空");
+}
+
+// 👉 防止 JSON 崩溃
+let data;
+try {
+  data = JSON.parse(dataText);
+} catch (e) {
+  throw new Error("接口返回非JSON：" + dataText.slice(0, 100));
+}
 
     const item = data.item_list[0];
 
