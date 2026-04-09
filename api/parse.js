@@ -10,87 +10,36 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ success: false, error: "缺少 url 参数" });
     }
 
-    // 🌟 核心破局点：伪装成正常电脑浏览器的请求头，包含假 Cookie 绕过风控
-    const fakeHeaders = {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-      "Referer": "https://www.douyin.com/",
-      "Cookie": "ttwid=1w; odin_tt=1w;" // 随便给个假值，抖音有时只要看到有这个键就不拦截
-    };
+    // 🌟 终极方案：调用稳定的第三方免费解析接口 (TenAPI)
+    // 直接把清洗好的抖音链接发给第三方，由他们处理复杂的 X-Bogus 签名和 IP 代理池
+    const apiUrl = `https://tenapi.cn/v2/douyin?url=${encodeURIComponent(url)}`;
 
-    // 1️⃣ 先获取跳转后的真实地址
-    const response = await fetch(url, {
+    const response = await fetch(apiUrl, {
       method: "GET",
-      redirect: "follow",
-      headers: fakeHeaders,
-    });
-
-    const realUrl = response.url;
-
-    // 2️⃣ 提取 video id
-    const videoMatch = realUrl.match(/video\/(\d+)/);
-    if (!videoMatch) {
-      const noteMatch = realUrl.match(/note\/(\d+)/);
-      if (noteMatch) {
-         return res.status(400).json({ success: false, error: "您输入的是图文链接，当前仅支持视频" });
+      headers: {
+        // 给第三方接口也加个基础伪装，防止被第三方接口拦截
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
       }
-      return res.status(500).json({ success: false, error: "解析视频ID失败，可能是链接已失效" });
-    }
-
-    const videoId = videoMatch[1];
-
-    // 3️⃣ 调用抖音接口
-    const api = `https://www.iesdouyin.com/web/api/v2/aweme/iteminfo/?item_ids=${videoId}&aid=1128`;
-
-    const dataRes = await fetch(api, {
-      method: "GET",
-      headers: fakeHeaders, // 🌟 这里也用上伪装头
     });
 
-    const dataText = await dataRes.text();
+    const data = await response.json();
 
-    if (!dataText) {
-      throw new Error("抖音接口依然返回空数据，Vercel 节点可能被严控");
+    // 第三方接口返回 code: 200 表示解析成功
+    if (data.code === 200 && data.data) {
+      return res.status(200).json({
+        success: true,
+        video: data.data.url,     // 第三方提取好的无水印视频直链
+        desc: data.data.title,    // 视频文案标题
+      });
+    } else {
+      // 如果第三方也解析失败，抛出他们的错误信息
+      throw new Error(data.msg || "未找到视频数据");
     }
-
-    // 👉 防止 JSON 解析导致程序崩溃
-    let data;
-    try {
-      data = JSON.parse(dataText);
-    } catch (e) {
-      throw new Error("接口返回非 JSON 数据 (可能弹出了滑块验证码)");
-    }
-
-    // 🚨 校验数据结构是否完整
-    if (!data || !data.item_list || data.item_list.length === 0) {
-      return res.status(500).json({ success: false, error: "视频可能已被删除，或风控导致未返回视频实体" });
-    }
-
-    const item = data.item_list[0];
-
-    if (!item.video || !item.video.play_addr || !item.video.play_addr.url_list) {
-        return res.status(500).json({ success: false, error: "视频地址结构异常" });
-    }
-
-    // 4️⃣ 获取无水印视频并替换标识
-    let video = item.video.play_addr.url_list[0];
-    video = video.replace("playwm", "play"); // playwm 是有水印，play 是无水印
-
-    // 再请求一次拿最终直链
-    const finalVideo = await fetch(video, {
-      headers: fakeHeaders,
-      redirect: "follow",
-    });
-
-    return res.status(200).json({
-      success: true,
-      video: finalVideo.url,
-      desc: item.desc,
-    });
 
   } catch (e) {
     return res.status(500).json({
       success: false,
-      error: "解析异常",
+      error: "服务器解析异常",
       detail: e.message,
     });
   }
