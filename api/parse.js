@@ -10,30 +10,36 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ success: false, error: "缺少 url 参数" });
     }
 
-    // 🌟 终极方案：调用稳定的第三方免费解析接口 (TenAPI)
-    // 直接把清洗好的抖音链接发给第三方，由他们处理复杂的 X-Bogus 签名和 IP 代理池
-    const apiUrl = `https://tenapi.cn/v2/douyin?url=${encodeURIComponent(url)}`;
+    // 🌟 换用另一个非常出名且稳定的免费去水印接口 (韩小韩API)
+    const apiUrl = `https://api.vvhan.com/api/wm?url=${encodeURIComponent(url)}`;
 
     const response = await fetch(apiUrl, {
       method: "GET",
       headers: {
-        // 给第三方接口也加个基础伪装，防止被第三方接口拦截
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
       }
     });
 
-    const data = await response.json();
+    // 🛡️ 防崩溃保护：先拿纯文本，不着急转 JSON
+    const rawText = await response.text();
 
-    // 第三方接口返回 code: 200 表示解析成功
-    if (data.code === 200 && data.data) {
+    // 检查是不是被防火墙拦截，返回了 HTML 网页
+    if (rawText.trim().startsWith("<")) {
+      throw new Error("第三方接口开启了防爬虫验证，Vercel 海外节点被拦截");
+    }
+
+    // 确认是安全的数据后再解析
+    const data = JSON.parse(rawText);
+
+    // 韩小韩 API 的成功标识是 success 为 true
+    if (data.success) {
       return res.status(200).json({
         success: true,
-        video: data.data.url,     // 第三方提取好的无水印视频直链
-        desc: data.data.title,    // 视频文案标题
+        video: data.video || data.url, // 兼容接口可能返回的不同字段
+        desc: data.title || data.desc || "解析成功！",
       });
     } else {
-      // 如果第三方也解析失败，抛出他们的错误信息
-      throw new Error(data.msg || "未找到视频数据");
+      throw new Error(data.message || "第三方接口解析失败");
     }
 
   } catch (e) {
