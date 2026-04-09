@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>抖音解析工具</title>
+</head>
+<body>
+
+<h2>抖音无水印解析</h2>
+
+<input id="url" placeholder="粘贴抖音链接" style="width:300px;">
+<button onclick="parse()">解析</button>
+
+<p id="desc"></p>
+<a id="video" target="_blank"></a>
+
+<script>
+async function parse() {
+    let url = document.getElementById("url").value;
+
+    let res = await fetch("/api/parse?url=" + encodeURIComponent(url));
+    let data = await res.json();
+
+    document.getElementById("desc").innerText = data.desc;
+    document.getElementById("video").href = data.video;
+    document.getElementById("video").innerText = "下载视频";
+}
+</script>
+
+</body>
+</html>
