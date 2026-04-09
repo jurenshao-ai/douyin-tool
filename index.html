@@ -27,50 +27,58 @@
     </div>
 
     <script>
-    async function parse() {
-        const urlInput = document.getElementById("url").value.trim();
-        const descEl = document.getElementById("desc");
-        const videoEl = document.getElementById("video");
-        const btn = document.getElementById("parseBtn");
+async function parse() {
+    const rawInput = document.getElementById("url").value.trim(); // 获取原始输入
+    const descEl = document.getElementById("desc");
+    const videoEl = document.getElementById("video");
+    const btn = document.getElementById("parseBtn");
 
-        if (!urlInput) {
-            alert("请先填入链接！");
-            return;
-        }
-
-        // 👉 1. 开启 Loading 状态
-        descEl.innerText = "正在疯狂解析中，请稍候...";
-        descEl.style.color = "#666";
-        videoEl.href = "";
-        videoEl.innerText = "";
-        btn.disabled = true;
-        btn.innerText = "解析中...";
-
-        try {
-            // 👉 2. 发起请求
-            const res = await fetch("/api/parse?url=" + encodeURIComponent(urlInput));
-            const data = await res.json();
-
-            // 👉 3. 渲染结果
-            if (data.success) {
-                descEl.innerText = data.desc || "解析成功！";
-                descEl.style.color = "#333";
-                videoEl.href = data.video;
-                videoEl.innerText = "👉 点击这里下载无水印视频";
-            } else {
-                descEl.innerText = "❌ 失败: " + (data.error || "未知错误");
-                descEl.style.color = "red";
-            }
-        } catch (err) {
-            descEl.innerText = "❌ 网络请求失败，请检查服务状态";
-            descEl.style.color = "red";
-        } finally {
-            // 👉 4. 恢复按钮
-            btn.disabled = false;
-            btn.innerText = "开始解析";
-        }
+    if (!rawInput) {
+        alert("请先填入内容！");
+        return;
     }
-    </script>
+
+    // 🌟 新增核心逻辑：自动提取纯链接 🌟
+    const urlMatch = rawInput.match(/(https?:\/\/[^\s]+)/);
+    if (!urlMatch) {
+        alert("未能从输入内容中找到有效的网址，请检查！");
+        return;
+    }
+    const cleanUrl = urlMatch[1]; // 提取出干净的链接
+
+    // 👉 1. 开启 Loading 状态
+    descEl.innerText = "正在疯狂解析中，请稍候...";
+    descEl.style.color = "#666";
+    videoEl.href = "";
+    videoEl.innerText = "";
+    btn.disabled = true;
+    btn.innerText = "解析中...";
+
+    try {
+        // 👉 2. 发起请求 (注意这里改成了 encodeURIComponent(cleanUrl))
+        const res = await fetch("/api/parse?url=" + encodeURIComponent(cleanUrl));
+        const data = await res.json();
+
+        // 👉 3. 渲染结果
+        if (data.success) {
+            descEl.innerText = data.desc || "解析成功！";
+            descEl.style.color = "#333";
+            videoEl.href = data.video;
+            videoEl.innerText = "👉 点击这里下载无水印视频";
+        } else {
+            descEl.innerText = "❌ 失败: " + (data.error || "未知错误");
+            descEl.style.color = "red";
+        }
+    } catch (err) {
+        descEl.innerText = "❌ 网络请求失败，请检查服务状态";
+        descEl.style.color = "red";
+    } finally {
+        // 👉 4. 恢复按钮
+        btn.disabled = false;
+        btn.innerText = "开始解析";
+    }
+}
+</script>
 
 </body>
 </html>
