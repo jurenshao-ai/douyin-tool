@@ -1,31 +1,76 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>抖音解析工具</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 500px; margin: 0 auto; text-align: center; }
+        input { width: 100%; padding: 12px; margin-bottom: 15px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        button { width: 100%; padding: 12px; background-color: #fe2c55; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
+        button:disabled { background-color: #ff94a7; cursor: not-allowed; }
+        .result-box { margin-top: 25px; text-align: left; }
+        #desc { font-size: 15px; color: #333; line-height: 1.5; }
+        #video { display: inline-block; margin-top: 10px; color: #fe2c55; text-decoration: none; font-weight: bold; word-break: break-all;}
+    </style>
 </head>
 <body>
 
-<h2>抖音无水印解析</h2>
+    <h2>抖音无水印解析</h2>
 
-<input id="url" placeholder="粘贴抖音链接" style="width:300px;">
-<button onclick="parse()">解析</button>
+    <input id="url" type="text" placeholder="在此粘贴抖音分享链接...">
+    <button id="parseBtn" onclick="parse()">开始解析</button>
 
-<p id="desc"></p>
-<a id="video" target="_blank"></a>
+    <div class="result-box">
+        <p id="desc"></p>
+        <a id="video" target="_blank"></a>
+    </div>
 
-<script>
-async function parse() {
-    let url = document.getElementById("url").value;
+    <script>
+    async function parse() {
+        const urlInput = document.getElementById("url").value.trim();
+        const descEl = document.getElementById("desc");
+        const videoEl = document.getElementById("video");
+        const btn = document.getElementById("parseBtn");
 
-    let res = await fetch("/api/parse?url=" + encodeURIComponent(url));
-    let data = await res.json();
+        if (!urlInput) {
+            alert("请先填入链接！");
+            return;
+        }
 
-    document.getElementById("desc").innerText = data.desc;
-    document.getElementById("video").href = data.video;
-    document.getElementById("video").innerText = "下载视频";
-}
-</script>
+        // 👉 1. 开启 Loading 状态
+        descEl.innerText = "正在疯狂解析中，请稍候...";
+        descEl.style.color = "#666";
+        videoEl.href = "";
+        videoEl.innerText = "";
+        btn.disabled = true;
+        btn.innerText = "解析中...";
+
+        try {
+            // 👉 2. 发起请求
+            const res = await fetch("/api/parse?url=" + encodeURIComponent(urlInput));
+            const data = await res.json();
+
+            // 👉 3. 渲染结果
+            if (data.success) {
+                descEl.innerText = data.desc || "解析成功！";
+                descEl.style.color = "#333";
+                videoEl.href = data.video;
+                videoEl.innerText = "👉 点击这里下载无水印视频";
+            } else {
+                descEl.innerText = "❌ 失败: " + (data.error || "未知错误");
+                descEl.style.color = "red";
+            }
+        } catch (err) {
+            descEl.innerText = "❌ 网络请求失败，请检查服务状态";
+            descEl.style.color = "red";
+        } finally {
+            // 👉 4. 恢复按钮
+            btn.disabled = false;
+            btn.innerText = "开始解析";
+        }
+    }
+    </script>
 
 </body>
 </html>
